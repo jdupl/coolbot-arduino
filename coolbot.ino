@@ -40,7 +40,7 @@ void setup() {
     sensors.begin();
 }
 
-boolean shouldChangeState() {
+boolean canChangeState() {
   if (lastRelayChangeMS < 0 || lastRelayChangeMS > WAIT_CHANGE_MS) {
     return true;
   }
@@ -49,47 +49,60 @@ boolean shouldChangeState() {
   return false;
 }
 
-void loop() {
-    int targetTemp = 8;
-    float currentTemp = -253.0;
+boolean mustOpenForIce(float t1, float t2) {
+  return t1 <= 2 || t2 <= 2;
+}
 
+boolean mustCloseForRoom(float t1, float t2) {
+  return t1 > targetTemp || t2 > targetTemp;
+}
+
+void loop() {
+    int targetTemp = 5;
     Serial.print("Requesting temperatures...");
 
     sensors.requestTemperatures();
-    currentTemp = sensors.getTempCByIndex(GRILL_SENSOR_INDEX);
+    float t1 = sensors.getTempCByIndex(0);
+    float t2 = sensors.getTempCByIndex(0);
     Serial.println("DONE");
 
-    Serial.println("Current: " + String(currentTemp) + "C");
+    Serial.println("Current t1: " + String(t1) + "C");
+    Serial.println("Current t2: " + String(t2) + "C");
     Serial.println("Target: " + String(targetTemp) + "C");
 
     lcd.setCursor(0,0);
     lcd.print("Target: " + String(targetTemp) + "C");
     lcd.setCursor(0,1);
-    lcd.print("Current: " + String(currentTemp) + "C");
+    lcd.print("Current: " + String(t1) + " " + String(t2));
 
-    lastRelayChangeMS = millis();
+
+    if (mustOpenForIce(t1, t2)) {
+      Serial.println("Relay should be open to relieve AC");
+      if (!relayClosed) {
+        Serial.println("Relay already open");
+      } else{
+        lastRelayChangeMS = millis();
+        Serial.println("Opening relay now !");
+        relayClosed = false;
+        digitalWrite(RELAY_PIN, HIGH);
+      }
+    } else if () {
+
+    }
     if (currentTemp > targetTemp) {
         Serial.println("Relay should be closed to power AC");
         if (relayClosed) {
           Serial.println("Relay already closed");
         } else{
-          if (shouldChangeState()) {
+          if (canChangeState()) {
+            lastRelayChangeMS = millis();
             Serial.println("Closing relay now !");
             relayClosed = true;
             digitalWrite(RELAY_PIN, LOW);
           }
         }
     } else {
-        Serial.println("Relay should be open to relieve AC");
-        if (!relayClosed) {
-          Serial.println("Relay already open");
-        } else{
-          if (shouldChangeState()) {
-            Serial.println("Opening relay now !");
-            relayClosed = false;
-            digitalWrite(RELAY_PIN, HIGH);
-          }
-        }
+
     }
     int key = readButtons();
 
