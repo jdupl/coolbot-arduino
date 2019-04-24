@@ -2,30 +2,33 @@
 #include <DallasTemperature.h>
 
 
-#define HEATER_RELAY_PIN   6
-#define ONE_WIRE_BUS 7
-#define WAIT_CHANGE_MS 10000
+#define HEATER_MOSFET_PIN   2
+#define LED_PIN   13
+#define ONE_WIRE_BUS 6
+#define WAIT_CHANGE_MS 1000
 
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
-unsigned long lastHeaterRelayChangeMS;
-boolean heaterRelayClosed = false;
-int targetTemp = 4;
+unsigned long lastHeaterMosfetChangeMS;
+boolean heaterMosfetClosed = false;
+int targetTemp = 2;
 
 void setup() {
     Serial.begin(9600);
-    pinMode(HEATER_RELAY_PIN, OUTPUT);
-    digitalWrite(HEATER_RELAY_PIN, HIGH);
+    pinMode(HEATER_MOSFET_PIN, OUTPUT);
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(HEATER_MOSFET_PIN, LOW);
+    digitalWrite(LED_PIN, LOW);
     sensors.begin();
 }
 
 boolean canChangeState() {
-  if (lastHeaterRelayChangeMS <= 0 || lastHeaterRelayChangeMS > WAIT_CHANGE_MS) {
+  if (lastHeaterMosfetChangeMS <= 0 || lastHeaterMosfetChangeMS > WAIT_CHANGE_MS) {
     return true;
   }
-  unsigned long waitMS = WAIT_CHANGE_MS - lastHeaterRelayChangeMS;
+  unsigned long waitMS = WAIT_CHANGE_MS - lastHeaterMosfetChangeMS;
   Serial.println("Change avoided due to time delay. Waiting for an additionnal " + String(waitMS) + " ms.");
   return false;
 }
@@ -45,54 +48,58 @@ boolean mustOpenForHeater(float t1, float t2) {
 void loop() {
     sensors.requestTemperatures();
     float t1 = sensors.getTempCByIndex(0);
-    float t2 = sensors.getTempCByIndex(0); // FIXME
+    float t2 = sensors.getTempCByIndex(1); // FIXME
 
     Serial.println("Current t1: " + String(t1) + "C");
-    // Serial.println("Current t2: " + String(t2) + "C");
+    Serial.println("Current t2: " + String(t2) + "C");
 
     if (mustOpenForIce(t1, t2)) {
-      Serial.println("Relay should be open to relieve AC of ice !");
-      if (!heaterRelayClosed) {
-        Serial.println("Relay already open");
+      Serial.println("Mosfet should be open to relieve AC of ice !");
+      if (!heaterMosfetClosed) {
+        Serial.println("Mosfet already open");
       } else{
-        lastHeaterRelayChangeMS = millis();
-        Serial.println("Opening relay now !");
-        heaterRelayClosed = false;
-        digitalWrite(HEATER_RELAY_PIN, HIGH);
+        lastHeaterMosfetChangeMS = millis();
+        Serial.println("Opening mosfet now !");
+        heaterMosfetClosed = false;
+        digitalWrite(HEATER_MOSFET_PIN, LOW);
+        digitalWrite(LED_PIN, LOW);
       }
   } else if (mustOpenForHeater(t1, t2)) {
-      Serial.println("Relay should be opened to cool heater");
-    if (!heaterRelayClosed) {
-      Serial.println("Relay already opened");
+      Serial.println("Mosfet should be opened to cool heater");
+    if (!heaterMosfetClosed) {
+      Serial.println("Mosfet already opened");
     } else{
-      lastHeaterRelayChangeMS = millis();
-      Serial.println("Opening relay now !");
-      heaterRelayClosed = false;
-      digitalWrite(HEATER_RELAY_PIN, HIGH);
+      lastHeaterMosfetChangeMS = millis();
+      Serial.println("Opening mosfet now !");
+      heaterMosfetClosed = false;
+      digitalWrite(HEATER_MOSFET_PIN, LOW);
+      digitalWrite(LED_PIN, LOW);
     }
   } else if (mustCloseForRoom(t1, t2)) {
-      Serial.println("Relay should be closed to power AC");
-      if (heaterRelayClosed) {
-        Serial.println("Relay already closed");
+      Serial.println("Mosfet should be closed to power AC");
+      if (heaterMosfetClosed) {
+        Serial.println("Mosfet already closed");
       } else{
         if (canChangeState()) {
-          lastHeaterRelayChangeMS = millis();
-          Serial.println("Closing relay now !");
-          heaterRelayClosed = true;
-          digitalWrite(HEATER_RELAY_PIN, LOW);
+          lastHeaterMosfetChangeMS = millis();
+          Serial.println("Closing mosfet now !");
+          heaterMosfetClosed = true;
+          digitalWrite(HEATER_MOSFET_PIN, HIGH);
+          digitalWrite(LED_PIN, HIGH);
         }
       }
     } else {
       // Temp is ok, open circuit
       Serial.println("Target temperature achieved");
-      if (!heaterRelayClosed) {
-        Serial.println("Relay already open");
+      if (!heaterMosfetClosed) {
+        Serial.println("Mosfet already open");
       } else{
         if (canChangeState()) {
-          lastHeaterRelayChangeMS = millis();
-          Serial.println("Opening relay now !");
-          heaterRelayClosed = false;
-          digitalWrite(HEATER_RELAY_PIN, HIGH);
+          lastHeaterMosfetChangeMS = millis();
+          Serial.println("Opening mosfet now !");
+          heaterMosfetClosed = false;
+          digitalWrite(HEATER_MOSFET_PIN, LOW);
+          digitalWrite(LED_PIN, LOW);
         }
       }
     }
